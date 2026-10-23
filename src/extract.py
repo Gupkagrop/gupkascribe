@@ -88,7 +88,7 @@ def extract_frames(video_path: str, frames_directory: str, video_basename: str) 
             .filter("select", select_expr)
             .output(
                 os.path.join(frames_directory, f"{video_basename}-frame-%04d.jpg"),
-                vsync="vfr",
+                fps_mode="vfr",
                 qscale=2,
             )
             .overwrite_output()
