@@ -128,8 +128,8 @@ recording/
 
 ### 1. Установка и запуск окружения
 ```powershell
-git clone https://github.com/Gupkagrop/recording.git
-cd recording
+git clone https://github.com/Gupkagrop/gupkascribe.git
+cd gupkascribe
 
 # Синхронизация зависимостей через uv:
 uv sync

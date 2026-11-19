@@ -1,3 +1,3 @@
 @echo off
-title Умная Транскрибация Видео
+title GupkaScribe Studio
 uv run python app_gui.py
