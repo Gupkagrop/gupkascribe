@@ -1,4 +1,4 @@
-"""Пакет recording — модуль автономной транскрибации лекций с аппаратным ускорением."""
+"""Пакет gupkascribe — модуль автономной транскрибации лекций с аппаратным ускорением."""
 
 from src.cuda_utils import setup_cuda_dll_paths
 from src.extract import (

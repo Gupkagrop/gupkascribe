@@ -84,7 +84,7 @@ flowchart TD
 ## 📁 Структура репозитория
 
 ```text
-recording/
+gupkascribe/
 ├── .agents/
 │   └── skills/
 │       ├── lecture-processor/      # Воркспейс-скилл сквозной обработки лекции агентом
