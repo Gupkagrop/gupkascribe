@@ -29,6 +29,9 @@ class TestProjectIntegrity(unittest.TestCase):
             "src/__init__.py",
             "src/extract.py",
             "src/cuda_utils.py",
+            "src/vault_utils.py",
+            ".agents/skills/lecture-processor/SKILL.md",
+            ".agents/skills/vault-curator/SKILL.md",
             "docs/architecture/pipeline.md",
             "docs/architecture/obsidian_vault.md",
         ]

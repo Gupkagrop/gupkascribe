@@ -10,6 +10,15 @@ from src.extract import (
     extract_frames,
     transcribe_audio,
 )
+from src.vault_utils import (
+    LinkAuditResult,
+    SubjectStats,
+    SystemTelemetry,
+    VaultStats,
+    get_system_telemetry,
+    get_vault_stats,
+    verify_link_integrity,
+)
 
 __version__ = "0.2.0"
 __all__ = [
@@ -22,4 +31,11 @@ __all__ = [
     "extract_content",
     "ExtractionError",
     "FFmpegExecutionError",
+    "get_vault_stats",
+    "verify_link_integrity",
+    "get_system_telemetry",
+    "SubjectStats",
+    "VaultStats",
+    "LinkAuditResult",
+    "SystemTelemetry",
 ]
