@@ -29,6 +29,19 @@ def check_ffmpeg_installed() -> bool:
     return shutil.which("ffmpeg") is not None
 
 
+def is_model_cached(model_size: str) -> bool:
+    """Проверка наличия весов модели Whisper в локальном кэше Hugging Face."""
+    try:
+        import faster_whisper.utils as fw_utils
+        from huggingface_hub import try_to_load_from_cache
+
+        repo_id = fw_utils._MODELS.get(model_size, model_size)
+        res = try_to_load_from_cache(repo_id, "model.bin")
+        return isinstance(res, str)
+    except Exception:
+        return False
+
+
 def _decode_ffmpeg_error(error: ffmpeg.Error) -> str:
     """Безопасное декодирование stderr от ffmpeg с защитой от сбоев кодировок Windows."""
     if not error.stderr:
@@ -75,6 +88,12 @@ def extract_audio(
 
 def _create_whisper_model(model_size: str, progress_cb: Optional[ProgressCallback] = None) -> WhisperModel:
     """Инициализация модели WhisperModel с автопереключением CUDA -> CPU."""
+    if not is_model_cached(model_size):
+        _log(
+            f"📥 Модель Whisper '{model_size}' не найдена локально. Автоматическая загрузка весов с Hugging Face Hub (однократная операция)...",
+            progress_cb,
+        )
+
     try:
         _log(f"Загрузка модели Whisper ({model_size}) на GPU CUDA...", progress_cb)
         return WhisperModel(model_size, device="cuda", compute_type="float16")
