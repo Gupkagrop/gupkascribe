@@ -13,7 +13,7 @@
 - **Architecture:** AI-First Platform (Tier 1: ИИ-агенты Antigravity; Tier 2: Вспомогательный десктопный GUI на CustomTkinter)
 
 ## 2. Completed Milestones
-- [x] **[2026-11-19] Унификация шаблонов и стандартов:** Приведение `.gitignore`, `.repomixignore`, `AGENTS.md` и `TASK.md` в 100% соответствие шаблонам `~/.gemini/config/templates`. (Commit: `pending`)
+- [x] **[2026-11-19] Унификация шаблонов и стандартов:** Приведение `.gitignore`, `.repomixignore`, `AGENTS.md` и `TASK.md` в 100% соответствие шаблонам `~/.gemini/config/templates`. (Commit: `46fde76`)
 - [x] **[2026-11-19] Ребрендинг GupkaScribe Studio:** Переименование репозитория GitHub в `Gupkagrop/gupkascribe`, обновление удалённых связей и метаданных. (Commit: `3642d20`)
 - [x] **[2026-11-19] Zero-Setup Deployment & FFmpeg Auto-Install:** Встроенный портативный FFmpeg через `imageio-ffmpeg`, адаптивный запуск `Запустить_Транскрибатор.bat` и fallback GPU CUDA ➔ CPU int8. (Commit: `dda8896`)
 - [x] **[2026-11-19] Информативное логирование Whisper:** Определение наличия весов модели в кэше Hugging Face и явное оповещение при автозагрузке. (Commit: `6988b75`)
