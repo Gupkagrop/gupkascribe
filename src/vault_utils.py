@@ -1,4 +1,7 @@
-"""Модуль аудита базы знаний Obsidian Vault, проверки целостности связей и системной телеметрии."""
+"""Модуль аудита базы знаний Obsidian Vault, проверки целостности связей и системной телеметрии.
+
+Поддерживает универсальную структуру для любых учебных дисциплин и произвольных лекционных курсов.
+"""
 
 import os
 import re
@@ -8,14 +11,23 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple, TypedDict
 
-TARGET_SUBJECTS: Dict[str, str] = {
+# Системные директории и плагины Obsidian, игнорируемые при анализе дисциплин
+SYSTEM_IGNORE_DIRS: Set[str] = {
+    ".obsidian",
+    "Telegram",
+    "textgenerator",
+    ".trash",
+    ".git",
+    "scratch",
+}
+
+# Рекомендуемые предустановленные дисциплины (могут дополняться любыми курсами)
+DEFAULT_SUBJECTS: Dict[str, str] = {
     "Математика Матанализ": "МатАн",
     "Дискретная математика": "ДМ",
     "Анализ данных и ИИ": "АДиИИ",
     "Алгебра, геометрия и теория дифференциальных уравнений": "АГиТДУ",
 }
-
-EXCLUDED_PREFIXES: Set[str] = {"ОРГ", "ИнЯз", "ПРОГ", "ИТиС", "ОПД", "ПФК"}
 
 MEDIA_EXTENSIONS: Set[str] = {
     ".png",
@@ -84,7 +96,8 @@ def is_media_link(target: str) -> bool:
 def _build_vault_index(vault_path: Path) -> Set[str]:
     """Построение множества имён всех существующих Markdown-заметок (без расширения)."""
     index: Set[str] = set()
-    for root, _, files in os.walk(vault_path):
+    for root, dirs, files in os.walk(vault_path):
+        dirs[:] = [d for d in dirs if d not in SYSTEM_IGNORE_DIRS]
         for f in files:
             if f.endswith(".md"):
                 index.add(Path(f).stem.lower())
@@ -92,7 +105,7 @@ def _build_vault_index(vault_path: Path) -> Set[str]:
 
 
 def get_vault_stats(vault_path_str: str) -> VaultStats:
-    """Сбор статистики по целевым дисциплинам в хранилище Obsidian Vault."""
+    """Динамический сбор статистики по всем дисциплинам в хранилище Obsidian Vault."""
     vault_path = Path(vault_path_str)
     stats: VaultStats = {
         "total_notes": 0,
@@ -103,10 +116,20 @@ def get_vault_stats(vault_path_str: str) -> VaultStats:
     if not vault_path.is_dir():
         return stats
 
-    for folder_name, _ in TARGET_SUBJECTS.items():
-        subject_dir = vault_path / folder_name
+    # 1. Автообнаружение всех предметных папок в хранилище
+    discovered_dirs = {
+        d.name: d
+        for d in vault_path.iterdir()
+        if d.is_dir() and d.name not in SYSTEM_IGNORE_DIRS
+    }
+
+    # Гарантируем присутствие дефолтных предметов в словаре для наглядности статуса
+    all_subject_names = set(discovered_dirs.keys()) | set(DEFAULT_SUBJECTS.keys())
+
+    for subject_name in sorted(all_subject_names):
+        subject_dir = vault_path / subject_name
         subj_stats = _collect_subject_stats(subject_dir)
-        stats["subjects"][folder_name] = subj_stats
+        stats["subjects"][subject_name] = subj_stats
         stats["total_notes"] += subj_stats["notes_count"]
         stats["total_terms"] += subj_stats["terms_count"]
 
@@ -146,8 +169,18 @@ def _count_deadlines(deadlines_file: Path) -> int:
         return 0
 
 
-def verify_link_integrity(vault_path_str: str) -> LinkAuditResult:
-    """Проверка всех wiki-ссылок хранилища на предмет битых и исключённых ссылок."""
+def _strip_markdown_code(content: str) -> str:
+    """Удаление блоков кода и инлайн-кода для исключения ложных совпадений синтаксиса Pandas вида df[['col']]."""
+    no_blocks = re.sub(r"```[\s\S]*?```", "", content)
+    no_inline = re.sub(r"`[^`\n]+`", "", no_blocks)
+    return no_inline
+
+
+def verify_link_integrity(
+    vault_path_str: str,
+    excluded_prefixes: Optional[Set[str]] = None,
+) -> LinkAuditResult:
+    """Универсальная проверка wiki-ссылок хранилища на предмет битых и исключённых ссылок."""
     vault_path = Path(vault_path_str)
     result: LinkAuditResult = {
         "broken_links": [],
@@ -160,30 +193,24 @@ def verify_link_integrity(vault_path_str: str) -> LinkAuditResult:
 
     known_notes = _build_vault_index(vault_path)
     pattern = re.compile(r"\[\[(.*?)\]\]")
+    excl = excluded_prefixes or set()
 
-    for root, _, files in os.walk(vault_path):
-        if ".obsidian" in root or "Telegram" in root:
-            continue
+    for root, dirs, files in os.walk(vault_path):
+        dirs[:] = [d for d in dirs if d not in SYSTEM_IGNORE_DIRS]
         for f in files:
             if not f.endswith(".md"):
                 continue
             file_path = Path(root) / f
-            _scan_file_links(file_path, pattern, known_notes, result)
+            _scan_file_links(file_path, pattern, known_notes, excl, result)
 
     return result
-
-
-def _strip_markdown_code(content: str) -> str:
-    """Удаление блоков кода и инлайн-кода для исключения синтаксиса Pandas вида df[['col']]."""
-    no_blocks = re.sub(r"```[\s\S]*?```", "", content)
-    no_inline = re.sub(r"`[^`\n]+`", "", no_blocks)
-    return no_inline
 
 
 def _scan_file_links(
     file_path: Path,
     pattern: re.Pattern,
     known_notes: Set[str],
+    excluded_prefixes: Set[str],
     result: LinkAuditResult,
 ) -> None:
     """Сканирование ссылок одного Markdown-файла."""
@@ -200,18 +227,19 @@ def _scan_file_links(
             continue
 
         result["total_links_scanned"] += 1
-        _classify_link(target, file_path.name, known_notes, result)
+        _classify_link(target, file_path.name, known_notes, excluded_prefixes, result)
 
 
 def _classify_link(
     target: str,
     source_filename: str,
     known_notes: Set[str],
+    excluded_prefixes: Set[str],
     result: LinkAuditResult,
 ) -> None:
     """Классификация ссылки: валидная, битая или ведущая на исключённую дисциплину."""
     prefix = target.split("-")[0].strip() if "-" in target else ""
-    if prefix in EXCLUDED_PREFIXES:
+    if prefix and prefix in excluded_prefixes:
         result["untracked_subject_links"].append(f"{source_filename} -> [[{target}]]")
         return
 

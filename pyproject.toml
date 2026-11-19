@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "recording"
+name = "gupkascribe"
 version = "0.2.0"
-description = "Автономный программный комплекс для транскрибации лекций с аппаратным ускорением CUDA и интеграцией в Obsidian Vault"
+description = "GupkaScribe Studio — автономный AI-конвейер обработки лекций и мультимодальная база знаний Obsidian с десктопным GUI"
 readme = "README.md"
 requires-python = ">=3.12"
 license = "MIT"

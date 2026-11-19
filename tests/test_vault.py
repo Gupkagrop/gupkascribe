@@ -54,13 +54,20 @@ class TestVaultUtils(unittest.TestCase):
             )
             (math_dir / "МатАн - Лекция 1. Тест.md").write_text(lecture_content, encoding="utf-8")
 
-            res = verify_link_integrity(str(vault))
+            # Проверка с фильтром исключённых дисциплин
+            res_filtered = verify_link_integrity(str(vault), excluded_prefixes={"ОРГ"})
 
-            self.assertEqual(res["valid_links_count"], 3)
-            self.assertEqual(len(res["broken_links"]), 1)
-            self.assertIn("Несуществующая заметка", res["broken_links"][0])
-            self.assertEqual(len(res["untracked_subject_links"]), 1)
-            self.assertIn("ОРГ - Лекция 1", res["untracked_subject_links"][0])
+            self.assertEqual(res_filtered["valid_links_count"], 3)
+            self.assertEqual(len(res_filtered["broken_links"]), 1)
+            self.assertIn("Несуществующая заметка", res_filtered["broken_links"][0])
+            self.assertEqual(len(res_filtered["untracked_subject_links"]), 1)
+            self.assertIn("ОРГ - Лекция 1", res_filtered["untracked_subject_links"][0])
+
+            # Проверка в универсальном режиме (без исключений)
+            res_universal = verify_link_integrity(str(vault))
+            self.assertEqual(res_universal["valid_links_count"], 3)
+            self.assertEqual(len(res_universal["broken_links"]), 2)
+            self.assertEqual(len(res_universal["untracked_subject_links"]), 0)
 
     def test_get_vault_stats_hermetic(self) -> None:
         """Проверка агрегации показателей хранилища в синтетической структуре."""

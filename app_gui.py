@@ -1,16 +1,16 @@
 """Современный графический интерфейс управления транскрибацией и мониторинга базы знаний Obsidian.
 
-Реализован на базе CustomTkinter в соответствии с принципами эргономики UI/UX Dark Modern.
-Включает пакетную транскрибацию, дашборд базы знаний и системную телеметрию.
+GupkaScribe Studio — универсальная платформа для любых академических курсов и лекций.
+Реализован на базе CustomTkinter с гарантированной потокобезопасностью через queue.Queue.
 """
 
 import os
+import queue
 import shutil
-import subprocess
-import threading
 from pathlib import Path
 from tkinter import filedialog
-from typing import List, Optional
+from typing import Callable, Dict, List, Optional
+import threading
 
 import customtkinter as ctk
 
@@ -20,7 +20,9 @@ setup_cuda_dll_paths()
 
 from src.extract import ExtractionError, extract_content
 from src.vault_utils import (
+    DEFAULT_SUBJECTS,
     LinkAuditResult,
+    SubjectStats,
     SystemTelemetry,
     VaultStats,
     get_system_telemetry,
@@ -33,13 +35,17 @@ ctk.set_default_color_theme("blue")
 
 
 class TranscriberApp(ctk.CTk):
-    """Главное окно десктопного пульта управления транскрибацией и базой знаний."""
+    """Главное окно десктопного пульта управления транскрибацией и базой знаний GupkaScribe."""
 
     def __init__(self) -> None:
         super().__init__()
-        self.title("🎙️ Obsidian Lecture Studio & Knowledge Base Automator")
-        self.geometry("920x780")
-        self.minsize(860, 680)
+        self.title("🎙️ GupkaScribe Studio — Универсальная Студия Лекций")
+        self.geometry("940x800")
+        self.minsize(880, 700)
+
+        # 100% Потокобезопасная очередь задач для взаимодействия воркеров с UI
+        self.ui_queue: queue.Queue[Callable[[], None]] = queue.Queue()
+        self._start_queue_poller()
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
@@ -48,15 +54,29 @@ class TranscriberApp(ctk.CTk):
         self._build_tabs()
         self._refresh_telemetry_async()
 
+    def _start_queue_poller(self) -> None:
+        """Регулярный опрос очереди межпоточных задач строго в главном цикле событий Tk."""
+        while not self.ui_queue.empty():
+            try:
+                task = self.ui_queue.get_nowait()
+                task()
+            except Exception:
+                break
+        self.after(35, self._start_queue_poller)
+
+    def post_to_ui(self, callback: Callable[[], None]) -> None:
+        """Потокобезопасная постановка вызова функции в очередь главного потока UI."""
+        self.ui_queue.put(callback)
+
     def _build_header(self) -> None:
-        """Построение верхнего информационного баннера с индикацией режима работы."""
+        """Построение верхнего информационного баннера с фирменным брендингом."""
         self.header_frame = ctk.CTkFrame(self, fg_color="#1E293B", corner_radius=10)
         self.header_frame.grid(row=0, column=0, padx=16, pady=(12, 6), sticky="ew")
         self.header_frame.grid_columnconfigure(0, weight=1)
 
         title_lbl = ctk.CTkLabel(
             self.header_frame,
-            text="🎙️ Obsidian Lecture Studio (AI-First Auxiliary Console)",
+            text="🎙️ GupkaScribe Studio  •  by gupkagrop",
             font=("Segoe UI", 16, "bold"),
             text_color="#F8FAFC",
         )
@@ -64,7 +84,7 @@ class TranscriberApp(ctk.CTk):
 
         subtitle_lbl = ctk.CTkLabel(
             self.header_frame,
-            text="Первичный режим: AI-агенты Antigravity | Вспомогательный режим: Интерактивный пульт пользователя",
+            text="Универсальный комплекс транскрибации любых лекций и синхронизации с базой знаний Obsidian",
             font=("Segoe UI", 11),
             text_color="#94A3B8",
         )
@@ -108,7 +128,7 @@ class TranscriberApp(ctk.CTk):
 
         self.lbl_queue_count = ctk.CTkLabel(
             top_row,
-            text="Очередь видеозаписей (0 файлов):",
+            text="Очередь видеозаписей любых курсов (0 файлов):",
             font=("Segoe UI", 13, "bold"),
             text_color="#F8FAFC",
         )
@@ -142,10 +162,10 @@ class TranscriberApp(ctk.CTk):
         model_opts = [
             "small (Сбалансированная / Рекомендуется)",
             "base (Быстрая / Черновая)",
-            "medium (Высокая точность)",
+            "medium (Высокая точность для терминов)",
             "large-v3 (Максимальное качество)",
         ]
-        self.combo_model = ctk.CTkComboBox(card, values=model_opts, width=320)
+        self.combo_model = ctk.CTkComboBox(card, values=model_opts, width=340)
         self.combo_model.set(model_opts[0])
         self.combo_model.grid(row=0, column=1, padx=12, pady=6, sticky="w")
 
@@ -224,10 +244,10 @@ class TranscriberApp(ctk.CTk):
         self.txt_log.grid(row=1, column=0, padx=8, pady=(0, 8), sticky="nsew")
 
     # -------------------------------------------------------------------------
-    # Вкладка 2: База знаний (Obsidian Vault Dashboard)
+    # Вкладка 2: База знаний (Универсальный дашборд любых дисциплин)
     # -------------------------------------------------------------------------
     def _build_vault_tab(self, tab: ctk.CTkFrame) -> None:
-        """Построение вкладки мониторинга и аудита базы знаний."""
+        """Построение универсальной вкладки мониторинга и аудита базы знаний."""
         tab.grid_columnconfigure(0, weight=1)
         tab.grid_rowconfigure(2, weight=1)
 
@@ -246,13 +266,12 @@ class TranscriberApp(ctk.CTk):
         btn_open_vault = ctk.CTkButton(top_card, text="📂 Открыть в проводнике", width=170, command=self._open_vault_folder)
         btn_open_vault.grid(row=0, column=2, padx=10, pady=8)
 
-        self.frame_disciplines = ctk.CTkFrame(tab, fg_color="transparent")
-        self.frame_disciplines.grid(row=1, column=0, padx=10, pady=4, sticky="ew")
-        for i in range(4):
-            self.frame_disciplines.grid_columnconfigure(i, weight=1)
+        # Контейнер для динамических карточек дисциплин с поддержкой прокрутки
+        self.scroll_disciplines = ctk.CTkScrollableFrame(tab, height=110, fg_color="transparent", orientation="horizontal")
+        self.scroll_disciplines.grid(row=1, column=0, padx=10, pady=4, sticky="ew")
 
-        self.discipline_cards: List[ctk.CTkFrame] = []
-        self._init_discipline_cards()
+        self.discipline_labels: Dict[str, ctk.CTkLabel] = {}
+        self._populate_initial_subject_cards()
 
         audit_card = ctk.CTkFrame(tab, fg_color="#1E293B", corner_radius=8)
         audit_card.grid(row=2, column=0, padx=10, pady=8, sticky="nsew")
@@ -265,7 +284,7 @@ class TranscriberApp(ctk.CTk):
 
         self.lbl_audit_status = ctk.CTkLabel(
             audit_bar,
-            text="Аудит связей (Zero Broken Links Protocol): Нажмите для запуска проверки",
+            text="Аудит связей (Zero Broken Links): Нажмите для сканирования любых курсов",
             font=("Segoe UI", 13, "bold"),
             text_color="#F8FAFC",
         )
@@ -284,30 +303,29 @@ class TranscriberApp(ctk.CTk):
         self.txt_audit_log = ctk.CTkTextbox(audit_card, state="disabled", font=("Consolas", 11))
         self.txt_audit_log.grid(row=1, column=0, padx=12, pady=(0, 10), sticky="nsew")
 
-    def _init_discipline_cards(self) -> None:
-        """Создание четырёх визуальных карточек для целевых дисциплин."""
-        disciplines = [
-            ("МатАнализ", "МатАн", "#0288D1"),
-            ("Дискретная мат-ка", "ДМ", "#7C3AED"),
-            ("Анализ данных и ИИ", "АДиИИ", "#22C55E"),
-            ("АГиТДУ", "АГиТДУ", "#F59E0B"),
-        ]
-        self.card_labels: List[ctk.CTkLabel] = []
+    def _populate_initial_subject_cards(self) -> None:
+        """Создание стартовых карточек для предустановленных дисциплин."""
+        for name, prefix in DEFAULT_SUBJECTS.items():
+            self._create_or_update_subject_card(name, prefix, notes=0, terms=0)
 
-        for idx, (title, prefix, color) in enumerate(disciplines):
-            card = ctk.CTkFrame(self.frame_disciplines, fg_color="#1E293B", corner_radius=8)
-            card.grid(row=0, column=idx, padx=4, pady=4, sticky="nsew")
-            card.grid_columnconfigure(0, weight=1)
+    def _create_or_update_subject_card(self, name: str, prefix: str, notes: int, terms: int) -> None:
+        """Создание или обновление плашки курса в горизонтальном скроллере."""
+        if name in self.discipline_labels:
+            self.discipline_labels[name].configure(text=f"Конспектов: {notes} | Понятий: {terms}")
+            return
 
-            t_lbl = ctk.CTkLabel(card, text=f"📘 {title}", font=("Segoe UI", 12, "bold"), text_color=color)
-            t_lbl.grid(row=0, column=0, padx=8, pady=(8, 2), sticky="w")
+        card = ctk.CTkFrame(self.scroll_disciplines, fg_color="#1E293B", corner_radius=8, width=220)
+        card.pack(side="left", padx=5, pady=2, fill="y")
 
-            p_lbl = ctk.CTkLabel(card, text=f"Префикс: {prefix}", font=("Segoe UI", 10), text_color="#94A3B8")
-            p_lbl.grid(row=1, column=0, padx=8, pady=0, sticky="w")
+        t_lbl = ctk.CTkLabel(card, text=f"📘 {name[:24]}", font=("Segoe UI", 12, "bold"), text_color="#38BDF8")
+        t_lbl.pack(padx=10, pady=(6, 1), anchor="w")
 
-            stat_lbl = ctk.CTkLabel(card, text="Загрузка...", font=("Segoe UI", 11), text_color="#F8FAFC")
-            stat_lbl.grid(row=2, column=0, padx=8, pady=(4, 8), sticky="w")
-            self.card_labels.append(stat_lbl)
+        p_lbl = ctk.CTkLabel(card, text=f"Код: {prefix}", font=("Segoe UI", 10), text_color="#94A3B8")
+        p_lbl.pack(padx=10, pady=0, anchor="w")
+
+        stat_lbl = ctk.CTkLabel(card, text=f"Конспектов: {notes} | Понятий: {terms}", font=("Segoe UI", 11), text_color="#F8FAFC")
+        stat_lbl.pack(padx=10, pady=(2, 6), anchor="w")
+        self.discipline_labels[name] = stat_lbl
 
     # -------------------------------------------------------------------------
     # Вкладка 3: Телеметрия системы
@@ -346,12 +364,12 @@ class TranscriberApp(ctk.CTk):
         btn_refresh.grid(row=4, column=0, padx=14, pady=12, sticky="w")
 
     # -------------------------------------------------------------------------
-    # Обработчики событий и асинхронные рабочие потоки
+    # Обработчики событий и асинхронные рабочие потоки (Zero UI Freeze)
     # -------------------------------------------------------------------------
     def _browse_videos(self) -> None:
         """Диалог множественного выбора видеофайлов с обновлением счетчика."""
         types = [("Видеофайлы", "*.mp4 *.mkv *.avi *.mov *.webm *.flv"), ("Все файлы", "*.*")]
-        files = filedialog.askopenfilenames(title="Выберите видеозаписи лекций", filetypes=types)
+        files = filedialog.askopenfilenames(title="Выберите видеозаписи любых лекций", filetypes=types)
         if not files:
             return
 
@@ -384,8 +402,8 @@ class TranscriberApp(ctk.CTk):
         self.txt_log.configure(state="disabled")
 
     def _log_msg(self, msg: str) -> None:
-        """Маршалинг сообщения в UI-поток."""
-        self.after(0, lambda: self._safe_append_log(msg))
+        """Маршалинг сообщения через потокобезопасную очередь в главный поток."""
+        self.post_to_ui(lambda: self._safe_append_log(msg))
 
     def _clear_log(self) -> None:
         """Очистка терминального виджета."""
@@ -412,7 +430,7 @@ class TranscriberApp(ctk.CTk):
             os.startfile(v)
 
     def _start_transcription_worker(self) -> None:
-        """Запуск фонового процесса транскрибации."""
+        """Запуск фонового процесса транскрибации без блокировки интерфейса."""
         raw = self.txt_queue.get("1.0", "end-1c").strip()
         save_dir = self.entry_save_dir.get().strip()
         paths = [p.strip().strip('"').strip("'") for p in raw.splitlines() if p.strip()]
@@ -447,21 +465,21 @@ class TranscriberApp(ctk.CTk):
         model_size: str,
         save_to_dl: bool,
     ) -> None:
-        """Фоновый цикл обработки видеозаписей с вызовом единого сервисного ядра."""
+        """Фоновый цикл обработки видеозаписей с вызовом сервисного ядра."""
         try:
             total = len(paths)
             for idx, p in enumerate(paths, start=1):
                 progress = idx / total
-                self.after(0, lambda pr=progress: self.progress_bar.set(pr))
+                self.post_to_ui(lambda pr=progress: self.progress_bar.set(pr))
                 self._process_single_item(p, save_dir, save_to_dl)
             self._log_msg("\n🎉 Вся очередь успешно обработана!")
         except Exception as exc:
             self._log_msg(f"❌ Критический сбой пайплайна: {exc}")
         finally:
-            self.after(0, lambda: self._set_processing_busy(False))
+            self.post_to_ui(lambda: self._set_processing_busy(False))
 
     def _process_single_item(self, video_path: str, save_dir: str, save_to_dl: bool) -> None:
-        """Обработка отдельного видеофайла."""
+        """Обработка отдельного видеофайла любой дисциплины."""
         if not os.path.isfile(video_path):
             self._log_msg(f"Пропуск: файл не найден -> {video_path}")
             return
@@ -502,7 +520,7 @@ class TranscriberApp(ctk.CTk):
         def _worker() -> None:
             stats = get_vault_stats(vault)
             audit = verify_link_integrity(vault)
-            self.after(0, lambda: self._apply_audit_results(stats, audit))
+            self.post_to_ui(lambda: self._apply_audit_results(stats, audit))
 
         threading.Thread(target=_worker, daemon=True).start()
 
@@ -510,16 +528,15 @@ class TranscriberApp(ctk.CTk):
         """Применение результатов аудита в главном потоке интерфейса."""
         self.btn_run_audit.configure(state="normal")
         broken_count = len(audit["broken_links"])
-        untracked_count = len(audit["untracked_subject_links"])
 
-        if broken_count == 0 and untracked_count == 0:
+        if broken_count == 0:
             self.lbl_audit_status.configure(
-                text=f"✅ База идеальна: 0 битых ссылок из {audit['total_links_scanned']} проверенных!",
+                text=f"✅ База идеальна: 0 битых связей из {audit['total_links_scanned']} проверенных!",
                 text_color="#22C55E",
             )
         else:
             self.lbl_audit_status.configure(
-                text=f"⚠️ Обнаружены дефекты: битых={broken_count}, посторонних={untracked_count}",
+                text=f"⚠️ Обнаружено {broken_count} битых связей в хранилище!",
                 text_color="#EF4444",
             )
 
@@ -527,18 +544,15 @@ class TranscriberApp(ctk.CTk):
         self._render_audit_report(stats, audit)
 
     def _render_discipline_stats(self, stats: VaultStats) -> None:
-        """Обновление показателей на карточках активных дисциплин."""
-        subjs = [
-            "Математика Матанализ",
-            "Дискретная математика",
-            "Анализ данных и ИИ",
-            "Алгебра, геометрия и теория дифференциальных уравнений",
-        ]
-        for idx, key in enumerate(subjs):
-            if idx >= len(self.card_labels):
-                break
-            st = stats["subjects"].get(key, {"notes_count": 0, "terms_count": 0})
-            self.card_labels[idx].configure(text=f"Конспектов: {st['notes_count']} | Терминов: {st['terms_count']}")
+        """Динамическое обновление показателей курсов в хранилище."""
+        for subj_name, st in stats["subjects"].items():
+            prefix = DEFAULT_SUBJECTS.get(subj_name, subj_name[:6].upper())
+            self._create_or_update_subject_card(
+                name=subj_name,
+                prefix=prefix,
+                notes=st["notes_count"],
+                terms=st["terms_count"],
+            )
 
     def _render_audit_report(self, stats: VaultStats, audit: LinkAuditResult) -> None:
         """Отрисовка подробного текстового отчета аудита."""
@@ -548,10 +562,10 @@ class TranscriberApp(ctk.CTk):
         lines = [
             f"=== АУДИТ БАЗЫ ЗНАНИЙ OBSIDIAN VAULT ===",
             f"Всего конспектов: {stats['total_notes']} | Всего терминов: {stats['total_terms']}",
-            f"Всего проверено ссылок: {audit['total_links_scanned']}",
-            f"Валидных ссылок: {audit['valid_links_count']}",
+            f"Всего обнаружено дисциплин: {len(stats['subjects'])}",
+            f"Всего проверено связей: {audit['total_links_scanned']}",
+            f"Валидных связей: {audit['valid_links_count']}",
             f"Битых ссылок: {len(audit['broken_links'])}",
-            f"Ссылок на исключенные предметы: {len(audit['untracked_subject_links'])}",
             f"Активных задач в Дедлайны и ДЗ.md: {stats['deadlines_count']}\n",
         ]
         if audit["broken_links"]:
@@ -564,10 +578,10 @@ class TranscriberApp(ctk.CTk):
         self.txt_audit_log.configure(state="disabled")
 
     def _refresh_telemetry_async(self) -> None:
-        """Асинхронный опрос системных ресурсов."""
+        """Асинхронный опрос системных ресурсов без блокировки окна."""
         def _worker() -> None:
             data = get_system_telemetry()
-            self.after(0, lambda: self._apply_telemetry(data))
+            self.post_to_ui(lambda: self._apply_telemetry(data))
 
         threading.Thread(target=_worker, daemon=True).start()
 

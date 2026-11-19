@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🎙️ Obsidian Lecture Studio & Knowledge Base Automator
+# 🎙️ GupkaScribe Studio (Obsidian Lecture Automator)
 
 **Автономная мультимодальная фабрика конспектов и базы знаний под управлением ИИ-агентов (Antigravity) со встроенным эргономичным десктопным пультом для локальной транскрибации (NVIDIA CUDA 12, cuDNN 9).**
 
@@ -9,7 +9,7 @@
 [![faster-whisper](https://img.shields.io/badge/faster--whisper-CTranslate2-FF6F00?style=for-the-badge)](https://github.com/SYSTRAN/faster-whisper)
 [![Obsidian](https://img.shields.io/badge/Obsidian-Vault-7C3AED?style=for-the-badge&logo=obsidian&logoColor=white)](https://obsidian.md/)
 [![AI-First Platform](https://img.shields.io/badge/Architecture-AI--First-10B981?style=for-the-badge)](.agents/skills/)
-[![Tests](https://img.shields.io/badge/Tests-16%2F16%20Passing-brightgreen?style=for-the-badge)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-17%2F17%20Passing-brightgreen?style=for-the-badge)](tests/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-F59E0B?style=for-the-badge)](LICENSE)
 
 </div>
@@ -32,9 +32,11 @@
 
 ---
 
-## 🎯 Целевой скоуп дисциплин
+## 🎯 Универсальный движок курсов (Universal Course Engine)
 
-В активной поддержке и разработке находятся строго **4 приоритетные дисциплины**:
+Платформа **GupkaScribe** полностью открыта и готова к масштабированию под любые учебные курсы и лекции (технические, IT, естественно-научные, гуманитарные). При появлении новой дисциплины агент динамически создаёт предметную директорию, Zettelkasten-термины и граф связей.
+
+### Активный университетский семестр (Базовый профиль):
 
 | № | Дисциплина | Официальный префикс | Статус в Obsidian | Пример конспекта |
 | :-: | :--- | :---: | :---: | :--- |
