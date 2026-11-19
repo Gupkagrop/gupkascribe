@@ -17,7 +17,6 @@ class TestProjectIntegrity(unittest.TestCase):
         """Проверка наличия всех обязательных файлов стандарта 2026 года."""
         required_files = [
             "AGENTS.md",
-            "GEMINI.md",
             "PROCESSED_VIDEOS.md",
             "README.md",
             "LICENSE",
@@ -27,6 +26,7 @@ class TestProjectIntegrity(unittest.TestCase):
             "requirements.txt",
             "TASK.md",
             "app_gui.py",
+            "src/__init__.py",
             "src/extract.py",
             "src/cuda_utils.py",
             "docs/architecture/pipeline.md",
