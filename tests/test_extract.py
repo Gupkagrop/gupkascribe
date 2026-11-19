@@ -13,8 +13,10 @@ from src.extract import (
     FFmpegExecutionError,
     _decode_ffmpeg_error,
     check_ffmpeg_installed,
+    ensure_ffmpeg,
     extract_audio,
     extract_content,
+    is_model_cached,
 )
 
 
@@ -49,6 +51,16 @@ class TestExtractModule(unittest.TestCase):
         """Функция настройки путей CUDA возвращает список путей без исключений."""
         paths = setup_cuda_dll_paths()
         self.assertIsInstance(paths, list)
+
+    def test_ensure_ffmpeg_succeeds(self) -> None:
+        """Проверка гарантированного обнаружения или автоподключения ffmpeg."""
+        result = ensure_ffmpeg()
+        self.assertTrue(result, "FFmpeg должен быть доступен (в системе или через встроенный imageio-ffmpeg).")
+
+    def test_is_model_cached_returns_bool(self) -> None:
+        """Проверка возврата булевого статуса наличия модели в кэше."""
+        result = is_model_cached("small")
+        self.assertIsInstance(result, bool)
 
     def test_exceptions_hierarchy(self) -> None:
         """Проверка корректной иерархии исключений."""

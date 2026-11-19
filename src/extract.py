@@ -24,9 +24,39 @@ class FFmpegExecutionError(ExtractionError):
     """Исключение при ошибках выполнения системных команд ffmpeg."""
 
 
+def ensure_ffmpeg() -> bool:
+    """Проверка и автоматическое подключение ffmpeg в PATH (системный или встроенный из imageio-ffmpeg)."""
+    if shutil.which("ffmpeg") is not None:
+        return True
+
+    try:
+        import imageio_ffmpeg
+
+        ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+        if ffmpeg_exe and os.path.exists(ffmpeg_exe):
+            bin_dir = Path(ffmpeg_exe).parent
+            target_name = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
+            target_path = bin_dir / target_name
+            if not target_path.exists():
+                shutil.copy2(ffmpeg_exe, target_path)
+
+            bin_str = str(bin_dir)
+            if bin_str not in os.environ.get("PATH", ""):
+                os.environ["PATH"] = bin_str + os.pathsep + os.environ.get("PATH", "")
+
+            return shutil.which("ffmpeg") is not None
+    except Exception:
+        pass
+
+    return False
+
+
+ensure_ffmpeg()
+
+
 def check_ffmpeg_installed() -> bool:
     """Проверка доступности бинарного файла ffmpeg в системном окружении."""
-    return shutil.which("ffmpeg") is not None
+    return ensure_ffmpeg()
 
 
 def is_model_cached(model_size: str) -> bool:
