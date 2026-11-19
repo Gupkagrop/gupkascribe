@@ -9,7 +9,7 @@
 [![faster-whisper](https://img.shields.io/badge/faster--whisper-CTranslate2-FF6F00?style=for-the-badge)](https://github.com/SYSTRAN/faster-whisper)
 [![Obsidian](https://img.shields.io/badge/Obsidian-Vault-7C3AED?style=for-the-badge&logo=obsidian&logoColor=white)](https://obsidian.md/)
 [![AI-First Platform](https://img.shields.io/badge/Architecture-AI--First-10B981?style=for-the-badge)](.agents/skills/)
-[![Tests](https://img.shields.io/badge/Tests-19%2F19%20Passing-brightgreen?style=for-the-badge)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-21%2F21%20Passing-brightgreen?style=for-the-badge)](tests/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-F59E0B?style=for-the-badge)](LICENSE)
 
 </div>

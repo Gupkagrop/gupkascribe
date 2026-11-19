@@ -1,47 +1,47 @@
-# 📋 TASK.md — Трекер состояния проекта GupkaScribe Studio (Obsidian Automation)
+# Project Living State Tracker (TASK.md)
 
-## 🎯 Текущий статус и фокус
-- **Проект:** `GupkaScribe Studio` (пакет `gupkascribe` v0.2.0)
-- **Архитектурный приоритет:** AI-First Platform (Tier 1: ИИ-агенты Antigravity; Tier 2: Вспомогательный десктопный GUI).
-- **Масштабируемость:** Универсальный движок для любых академических курсов и лекций (Universal Course Engine) с активным базовым семестром (МатАн, ДМ, АДиИИ, АГиТДУ).
-- **Воркспейс-скилы для агентов:**
-  - `.agents/skills/lecture-processor/SKILL.md` (8-шаговый сквозной пайплайн обработки лекций с точечным анализом кадров по таймкодам).
-  - `.agents/skills/vault-curator/SKILL.md` (динамическое обнаружение предметов, аудит связей, Zero Broken Links, изоляция дисциплин и дедлайнов).
-- **Сервисный слой:** Модули `src/extract.py`, `src/cuda_utils.py`, `src/vault_utils.py` со строгой типизацией (`TypedDict`), preflight-чеками и обработкой исключений.
-- **Пользовательский интерфейс:** Премиальный десктопный GUI `app_gui.py` на `CustomTkinter` (Dark Modern) с 3 вкладками (Пакетная транскрибация, Мониторинг базы знаний, Системная телеметрия) и 100% потокобезопасной архитектурой `queue.Queue`.
-- **Тестовое покрытие:** 17 модульных тестов (`tests/test_smoke.py`, `tests/test_extract.py`, `tests/test_vault.py`, `tests/test_gui.py`) — 100% green.
+> [!NOTE]
+> **Назначение файла:** Живой журнал состояния проекта для сквозной памяти между чатами ("Zero-Context-Amnesia").
+> Обновляется агентом в конце каждого выполненного этапа или задачи (Stage 4 SOP).
 
----
+## 1. Project Health & Stage
+- **Current Phase:** Phase 3: Production Readiness & Zero-Setup Deployment
+- **Status:** Ready / Production Stable
+- **Last Updated:** 2026-11-19 17:55
+- **Active Branch:** `master`
+- **Project Name:** GupkaScribe Studio (`gupkascribe` v0.2.0)
+- **Architecture:** AI-First Platform (Tier 1: ИИ-агенты Antigravity; Tier 2: Вспомогательный десктопный GUI на CustomTkinter)
 
-## 📌 Выполненные задачи (Changelog)
-- **19.11.2026 (Универсализация под любые лекции, брендинг GupkaScribe и стабилизация потокобезопасности):**
-  - Подтверждена безупречная работоспособность вспомогательного контура `app_gui.py`: реализована потокобезопасная очередь `queue.Queue` с главным поллером `self._start_queue_poller()` для устранения любых race conditions в Tkinter.
-  - Написан тест `tests/test_gui.py` для верификации потокобезопасности UI.
-  - Универсализированы скилы `.agents/skills/lecture-processor` и `.agents/skills/vault-curator` под любые дисциплины.
-  - Ребрендинг проекта в `GupkaScribe Studio` (`gupkascribe`) с сохранением никнейма `gupka` (отсылка к впитыванию знаний как губка и стенографисту-писарю Scribe).
-  - Все 17 тестов проходят успешно (`17/17 OK`).
+## 2. Completed Milestones
+- [x] **[2026-11-19] Унификация шаблонов и стандартов:** Приведение `.gitignore`, `.repomixignore`, `AGENTS.md` и `TASK.md` в 100% соответствие шаблонам `~/.gemini/config/templates`. (Commit: `pending`)
+- [x] **[2026-11-19] Ребрендинг GupkaScribe Studio:** Переименование репозитория GitHub в `Gupkagrop/gupkascribe`, обновление удалённых связей и метаданных. (Commit: `3642d20`)
+- [x] **[2026-11-19] Zero-Setup Deployment & FFmpeg Auto-Install:** Встроенный портативный FFmpeg через `imageio-ffmpeg`, адаптивный запуск `Запустить_Транскрибатор.bat` и fallback GPU CUDA ➔ CPU int8. (Commit: `dda8896`)
+- [x] **[2026-11-19] Информативное логирование Whisper:** Определение наличия весов модели в кэше Hugging Face и явное оповещение при автозагрузке. (Commit: `6988b75`)
+- [x] **[2026-11-19] Универсализация движка под любые курсы:** Динамическое обнаружение дисциплин в хранилище и поддержка любых лекций в воркспейс-скилах. (Commit: `0a02fed`)
+- [x] **[2026-11-19] Потокобезопасный CustomTkinter GUI:** Архитектура `queue.Queue` с поллером в главном потоке для устранения падений Tkinter. (Commit: `0a02fed`)
+- [x] **[2026-11-19] Воркспейс-скилы агентов:** Разработаны скилы `.agents/skills/lecture-processor` и `.agents/skills/vault-curator`. (Commit: `938acac`)
+- [x] **[2026-11-19] Чистка скоупа дисциплин Obsidian:** Удаление папки `Основы российской государственности` и изоляция дедлайнов. (Commit: `9c483ab`)
 
-- **19.11.2026 (Этап AI-First трансформации и модернизации GUI):**
-  - Подготовлен и утверждён Momus (`the-ruthless-reviewer`) план перехода к AI-First архитектуре.
-  - Разработаны воркспейс-скилы `.agents/skills/lecture-processor` и `.agents/skills/vault-curator`.
-  - Реализован сервисный модуль `src/vault_utils.py` (статистика хранилища, нормализация wiki-ссылок без ложных срабатываний, системная телеметрия GPU/FFmpeg).
-  - Полностью переработан десктопный интерфейс `app_gui.py`: добавлены 3 вкладки, очередь видео с бейджами, селектор моделей Whisper (`small`, `base`, `medium`, `large-v3`), асинхронный аудит хранилища без блокировки интерфейса и живая телеметрия.
-  - Написаны герметичные тесты `tests/test_vault.py` на базе `tempfile.TemporaryDirectory` (16/16 тестов проходят).
-  - Закреплена AI-First философия в `AGENTS.md`, `README.md` и `docs/architecture/pipeline.md`.
-  - Перегенерирована AST-карта кодовой базы `repomix-output.xml`.
+## 3. Active Task (Current Focus)
+- **Feature:** Полная валидация соответствия шаблонам конфигурации и финальная приёмка готовности проекта
+- **Target Files:**
+  - `.gitignore`
+  - `.repomixignore`
+  - `AGENTS.md`
+  - `TASK.md`
+  - `tests/test_smoke.py`
+- **Verification Plan:** `uv run python -m unittest discover tests` (19+ тестов) и `npx repomix`
 
-- **19.11.2026 (Полировка репозитория и удаление затычек):**
-  - Удалена устаревшая затычка `GEMINI.md`.
-  - Созданы `src/__init__.py` и `tests/__init__.py` (PEP 621 Python-пакет).
-  - Редизайн `README.md` со статусными бейджами и Mermaid-диаграммой.
+## 4. Next Immediate Steps (Backlog)
+- [ ] Пакетная обработка новых записей университетских лекций через агентский скилл `lecture-processor` или GUI.
+- [ ] Автоматический аудит графа связей хранилища Obsidian через `vault-curator` при добавлении новых конспектов.
+- [ ] Генерация новых предметных холстов Canvas для дисциплин семестра.
 
-- **19.11.2026 (Очистка скоупа дисциплин и стабилизация):**
-  - Удалена папка `Основы российской государственности` из Obsidian Vault (141 файл).
-  - Очищен файл `Дедлайны и ДЗ.md` с сохранением полной изоляции от графа связей.
-  - Актуализирован файл `PROCESSED_VIDEOS.md` под 4 целевые дисциплины.
-
----
-
-## 🚀 Бэклог и следующие шаги
-1. Пакетная обработка новых видеозаписей лекций по 4 целевым дисциплинам через агентов (`lecture-processor`) или вручную через GUI.
-2. Автоматический аудит базы знаний (`vault-curator`) перед каждым коммитом заметок в Vault.
+## 5. Architectural Decisions & Blockers
+- **Decisions Log:**
+  - `2026-11-19`: Принято имя **GupkaScribe Studio** (`gupkascribe`), объединяющее никнейм Дениса (`gupka` — метафора «впитывать знания как губка») и `scribe` (академический писарь/стенографист).
+  - `2026-11-19`: Интегрирован `imageio-ffmpeg` для поставки скомпилированного бинарника `ffmpeg.exe` «из коробки» без необходимости ручной установки пользователем.
+  - `2026-11-19`: Зафиксирована очередь `queue.Queue` и поллер `self._start_queue_poller()` для 100% защиты от падений Tkinter при асинхронных вызовах из воркеров.
+  - `2026-11-19`: Реализован гибридный инференс: автоматический переход на CPU `int8` при отсутствии видеокарты NVIDIA или драйвера CUDA 12.
+- **Known Blockers / Warnings:**
+  - None currently.

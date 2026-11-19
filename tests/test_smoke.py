@@ -21,6 +21,7 @@ class TestProjectIntegrity(unittest.TestCase):
             "README.md",
             "LICENSE",
             ".gitignore",
+            ".repomixignore",
             ".env.example",
             "pyproject.toml",
             "requirements.txt",
@@ -43,16 +44,18 @@ class TestProjectIntegrity(unittest.TestCase):
             )
 
     def test_agents_contract_structure(self) -> None:
-        """Проверка структуры и ключевых разделов файла AGENTS.md."""
+        """Проверка структуры и ключевых разделов файла AGENTS.md по шаблону AGENTS.template.md."""
         agents_file = self.root_dir / "AGENTS.md"
         content = agents_file.read_text(encoding="utf-8")
 
         expected_sections = [
-            "Tech Stack",
-            "Commands",
-            "Code Standards",
+            "Project Overview & Tech Stack",
+            "Standard Commands",
+            "Session Continuity & Orientation Protocol",
+            "Coding & Architecture Standards",
+            "Pre-Commit Checklist",
             "Architecture & Pipeline Rules",
-            "Prohibited Patterns",
+            "Prohibited Patterns & Safety",
         ]
         for section in expected_sections:
             self.assertIn(
@@ -100,6 +103,37 @@ class TestProjectIntegrity(unittest.TestCase):
         extract_path = self.root_dir / "src" / "extract.py"
         spec = importlib.util.spec_from_file_location("extract", extract_path)
         self.assertIsNotNone(spec, "Не удалось создать спецификацию для модуля extract.py")
+
+    def test_task_tracker_structure(self) -> None:
+        """Проверка соответствия структуры TASK.md шаблону TASK.template.md."""
+        task_file = self.root_dir / "TASK.md"
+        content = task_file.read_text(encoding="utf-8")
+
+        expected_sections = [
+            "Project Health & Stage",
+            "Completed Milestones",
+            "Active Task",
+            "Next Immediate Steps",
+            "Architectural Decisions & Blockers",
+        ]
+        for section in expected_sections:
+            self.assertIn(
+                section,
+                content,
+                f"Раздел '{section}' отсутствует в файле TASK.md.",
+            )
+
+    def test_templates_conformance(self) -> None:
+        """Проверка соответствия ключевых файлов шаблонам из ~/.gemini/config/templates."""
+        gitignore = (self.root_dir / ".gitignore").read_text(encoding="utf-8")
+        self.assertIn("repomix-output.*", gitignore)
+        self.assertIn(".venv/", gitignore)
+        self.assertIn("Thumbs.db", gitignore)
+
+        repomixignore = (self.root_dir / ".repomixignore").read_text(encoding="utf-8")
+        self.assertIn("node_modules/", repomixignore)
+        self.assertIn("tests/", repomixignore)
+        self.assertIn("*.wav", repomixignore)
 
 
 if __name__ == "__main__":
