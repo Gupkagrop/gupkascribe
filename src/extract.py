@@ -2,38 +2,59 @@
 
 import os
 import shutil
-import site
 import sys
-import time
 from pathlib import Path
-from typing import List
+from typing import Callable, Optional
 
-# Добавление путей к бинарным библиотекам NVIDIA CUDA в Windows PATH
-venv_site = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    ".venv",
-    "Lib",
-    "site-packages",
-)
-for lib in ["cublas", "cudnn", "cuda_nvrtc"]:
-    p = os.path.join(venv_site, "nvidia", lib, "bin")
-    if os.path.exists(p):
-        os.environ["PATH"] = p + os.pathsep + os.environ["PATH"]
-        try:
-            os.add_dll_directory(p)
-        except Exception:
-            pass
+from src.cuda_utils import setup_cuda_dll_paths
+
+setup_cuda_dll_paths()
 
 import ffmpeg
 from faster_whisper import WhisperModel
 
+ProgressCallback = Callable[[str], None]
 
-def extract_audio(video_path: str, temp_audio_path: str) -> None:
+
+class ExtractionError(Exception):
+    """Базовое исключение для ошибок процесса извлечения данных."""
+
+
+class FFmpegExecutionError(ExtractionError):
+    """Исключение при ошибках выполнения системных команд ffmpeg."""
+
+
+def check_ffmpeg_installed() -> bool:
+    """Проверка доступности бинарного файла ffmpeg в системном окружении."""
+    return shutil.which("ffmpeg") is not None
+
+
+def _decode_ffmpeg_error(error: ffmpeg.Error) -> str:
+    """Безопасное декодирование stderr от ffmpeg с защитой от сбоев кодировок Windows."""
+    if not error.stderr:
+        return str(error)
+    return error.stderr.decode("utf-8", errors="replace")
+
+
+def _log(message: str, progress_cb: Optional[ProgressCallback] = None) -> None:
+    """Вспомогательная функция отправки сообщения в коллбэк логов."""
+    if progress_cb is not None:
+        progress_cb(message)
+
+
+def extract_audio(
+    video_path: str,
+    temp_audio_path: str,
+    progress_cb: Optional[ProgressCallback] = None,
+) -> None:
     """Извлечение 16-битной PCM аудиодорожки с частотой 16 кГц через ffmpeg."""
-    if os.path.exists(temp_audio_path):
+    if os.path.exists(temp_audio_path) and os.path.getsize(temp_audio_path) > 0:
         return
 
-    print("Извлечение аудиодорожки...")
+    if not check_ffmpeg_installed():
+        raise FFmpegExecutionError("Исполняемый файл ffmpeg не найден в системном PATH.")
+
+    _log("Извлечение аудиодорожки...", progress_cb)
     try:
         (
             ffmpeg.input(video_path)
@@ -42,105 +63,161 @@ def extract_audio(video_path: str, temp_audio_path: str) -> None:
             .run(quiet=True)
         )
     except ffmpeg.Error as error:
-        err_msg = error.stderr.decode() if error.stderr else str(error)
-        print(f"Ошибка ffmpeg (аудио): {err_msg}")
-        sys.exit(1)
+        if os.path.exists(temp_audio_path):
+            os.remove(temp_audio_path)
+        err_msg = _decode_ffmpeg_error(error)
+        raise FFmpegExecutionError(f"Ошибка ffmpeg при извлечении аудио: {err_msg}") from error
+    except Exception as exc:
+        if os.path.exists(temp_audio_path):
+            os.remove(temp_audio_path)
+        raise ExtractionError(f"Непредвиденный сбой при извлечении аудио: {exc}") from exc
 
 
-def transcribe_audio(audio_path: str, transcript_file_path: str) -> None:
-    """Транскрибация аудио через модель faster-whisper с сохранением временных меток."""
-    if os.path.exists(transcript_file_path):
+def _create_whisper_model(model_size: str, progress_cb: Optional[ProgressCallback] = None) -> WhisperModel:
+    """Инициализация модели WhisperModel с автопереключением CUDA -> CPU."""
+    try:
+        _log(f"Загрузка модели Whisper ({model_size}) на GPU CUDA...", progress_cb)
+        return WhisperModel(model_size, device="cuda", compute_type="float16")
+    except Exception:
+        _log(f"CUDA недоступна. Переключение Whisper ({model_size}) на CPU (int8)...", progress_cb)
+        return WhisperModel(model_size, device="cpu", compute_type="int8")
+
+
+def transcribe_audio(
+    audio_path: str,
+    transcript_file_path: str,
+    model_size: str = "small",
+    progress_cb: Optional[ProgressCallback] = None,
+) -> None:
+    """Транскрибация аудио через faster-whisper с сохранением временных меток."""
+    if os.path.exists(transcript_file_path) and os.path.getsize(transcript_file_path) > 0:
         return
 
-    print("Транскрибация аудио (faster-whisper GPU CUDA)...")
+    _log("Транскрибация аудио в текст...", progress_cb)
+    model = _create_whisper_model(model_size, progress_cb)
+
     try:
-        model = WhisperModel("small", device="cuda", compute_type="float16")
-    except RuntimeError:
-        print("CUDA недоступна. Выполняется переключение на CPU (int8)...")
-        model = WhisperModel("small", device="cpu", compute_type="int8")
+        segments, _ = model.transcribe(
+            audio_path,
+            beam_size=5,
+            vad_filter=True,
+            vad_parameters=dict(min_silence_duration_ms=500),
+        )
+    except Exception as exc:
+        _log(f"Ошибка инференса на GPU: {exc}. Перезапуск транскрибации на CPU...", progress_cb)
+        model = WhisperModel(model_size, device="cpu", compute_type="int8")
+        segments, _ = model.transcribe(
+            audio_path,
+            beam_size=5,
+            vad_filter=True,
+            vad_parameters=dict(min_silence_duration_ms=500),
+        )
 
-    segments, _ = model.transcribe(
-        audio_path,
-        beam_size=5,
-        vad_filter=True,
-        vad_parameters=dict(min_silence_duration_ms=500),
-    )
+    temp_transcript = transcript_file_path + ".tmp"
+    try:
+        with open(temp_transcript, "w", encoding="utf-8") as file:
+            for segment in segments:
+                start_min = int(segment.start // 60)
+                start_sec = int(segment.start % 60)
+                line = f"[{start_min:02d}:{start_sec:02d}] {segment.text}"
+                file.write(line + "\n")
+                _log(line, progress_cb)
+        if os.path.exists(transcript_file_path):
+            os.remove(transcript_file_path)
+        os.rename(temp_transcript, transcript_file_path)
+    except Exception as exc:
+        if os.path.exists(temp_transcript):
+            os.remove(temp_transcript)
+        raise ExtractionError(f"Сбой записи файла транскрипции: {exc}") from exc
 
-    with open(transcript_file_path, "w", encoding="utf-8") as file:
-        for segment in segments:
-            start_min = int(segment.start // 60)
-            start_sec = int(segment.start % 60)
-            file.write(f"[{start_min:02d}:{start_sec:02d}] {segment.text}\n")
 
-
-def extract_frames(video_path: str, frames_directory: str, video_basename: str) -> None:
-    """Извлечение ключевых слайдов на основе умной детекции смены сцен (Scene Change Detection)."""
+def extract_frames(
+    video_path: str,
+    frames_directory: str,
+    video_basename: str,
+    progress_cb: Optional[ProgressCallback] = None,
+) -> None:
+    """Извлечение ключевых слайдов через Scene Change Detection с fallback на регулярные интервалы."""
+    os.makedirs(frames_directory, exist_ok=True)
     if len(os.listdir(frames_directory)) > 0:
         return
 
-    print("Извлечение ключевых слайдов лекции (умная детекция смены сцен)...")
+    if not check_ffmpeg_installed():
+        raise FFmpegExecutionError("Исполняемый файл ffmpeg не найден в системном PATH.")
+
+    _log("Извлечение ключевых слайдов (умная детекция смены сцен)...", progress_cb)
+    out_pattern = os.path.join(frames_directory, f"{video_basename}-frame-%04d.jpg")
+    select_expr = "isnan(prev_selected_t)+gte(t-prev_selected_t,5)*(gt(scene,0.05)+gte(t-prev_selected_t,120))"
+
     try:
-        # Умный фильтр: смена слайда (scene > 0.05) не чаще 1 раза в 5 сек,
-        # либо гарантированный снимок каждые 120 секунд при статичном экране.
-        select_expr = "isnan(prev_selected_t)+gte(t-prev_selected_t,5)*(gt(scene,0.05)+gte(t-prev_selected_t,120))"
         (
             ffmpeg.input(video_path)
             .filter("select", select_expr)
-            .output(
-                os.path.join(frames_directory, f"{video_basename}-frame-%04d.jpg"),
-                fps_mode="vfr",
-                qscale=2,
-            )
+            .output(out_pattern, fps_mode="vfr", qscale=2)
             .overwrite_output()
             .run(quiet=True)
         )
     except ffmpeg.Error as error:
-        err_msg = error.stderr.decode() if error.stderr else str(error)
-        print(f"Предупреждение ffmpeg (scene detection): {err_msg}. Переход на резервный режим...")
-        try:
-            (
-                ffmpeg.input(video_path)
-                .filter("fps", fps=1 / 60)
-                .output(os.path.join(frames_directory, f"{video_basename}-frame-%04d.jpg"))
-                .overwrite_output()
-                .run(quiet=True)
-            )
-        except ffmpeg.Error as fallback_err:
-            fallback_msg = fallback_err.stderr.decode() if fallback_err.stderr else str(fallback_err)
-            print(f"Критическая ошибка ffmpeg (кадры): {fallback_msg}")
-            sys.exit(1)
+        err_msg = _decode_ffmpeg_error(error)
+        _log(f"Предупреждение ffmpeg (scene detection): {err_msg}. Переход на резервный режим...", progress_cb)
+        _extract_frames_fallback(video_path, out_pattern)
 
 
-def extract_content(video_path: str) -> None:
-    """Координатор сквозного процесса подготовки данных из видеозаписи."""
-    if not os.path.exists(video_path):
-        print(f"Ошибка: Видеофайл не найден: {video_path}")
-        sys.exit(1)
+def _extract_frames_fallback(video_path: str, out_pattern: str) -> None:
+    """Резервное извлечение кадров с фиксированной частотой 1 кадр в минуту."""
+    try:
+        (
+            ffmpeg.input(video_path)
+            .filter("fps", fps=1 / 60)
+            .output(out_pattern)
+            .overwrite_output()
+            .run(quiet=True)
+        )
+    except ffmpeg.Error as fallback_err:
+        fallback_msg = _decode_ffmpeg_error(fallback_err)
+        raise FFmpegExecutionError(f"Критическая ошибка ffmpeg при нарезке кадров: {fallback_msg}") from fallback_err
+
+
+def extract_content(
+    video_path: str,
+    custom_save_dir: Optional[str] = None,
+    progress_cb: Optional[ProgressCallback] = None,
+) -> str:
+    """Координатор сквозного процесса подготовки данных из видеозаписи.
+
+    Returns:
+        str: Путь к каталогу с результатами обработки (аудио, транскрипт, кадры).
+    """
+    if not os.path.isfile(video_path):
+        raise ExtractionError(f"Видеофайл не найден: {video_path}")
 
     video_basename = os.path.splitext(os.path.basename(video_path))[0]
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    cache_dir = os.path.join(project_root, "cache", video_basename)
+    if custom_save_dir:
+        output_dir = os.path.join(custom_save_dir, video_basename)
+    else:
+        project_root = Path(__file__).resolve().parent.parent
+        output_dir = str(project_root / "cache" / video_basename)
 
-    os.makedirs(cache_dir, exist_ok=True)
-    temp_audio = os.path.join(cache_dir, "audio.wav")
-    transcript_file = os.path.join(cache_dir, "transcript.txt")
-    frames_dir = os.path.join(cache_dir, "frames")
-    os.makedirs(frames_dir, exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True)
+    temp_audio = os.path.join(output_dir, "audio.wav")
+    transcript_file = os.path.join(output_dir, "transcript.txt")
+    frames_dir = os.path.join(output_dir, "frames")
 
-    # 1. Извлечение аудио
-    extract_audio(video_path, temp_audio)
+    extract_audio(video_path, temp_audio, progress_cb)
+    transcribe_audio(temp_audio, transcript_file, progress_cb=progress_cb)
+    extract_frames(video_path, frames_dir, video_basename, progress_cb)
 
-    # 2. Распознавание речи
-    transcribe_audio(temp_audio, transcript_file)
-
-    # 3. Нарезка ключевых слайдов
-    extract_frames(video_path, frames_dir, video_basename)
-
-    print(f"\nГотово! Результаты сохранены в:\n{cache_dir}")
+    _log(f"✅ Успешно завершено! Результаты сохранены в: {output_dir}", progress_cb)
+    return output_dir
 
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Использование: uv run python src/extract.py <путь_к_видео>")
         sys.exit(1)
-    extract_content(sys.argv[1])
+
+    try:
+        extract_content(sys.argv[1], progress_cb=print)
+    except ExtractionError as err:
+        print(f"Ошибка обработки: {err}")
+        sys.exit(1)

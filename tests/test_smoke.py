@@ -23,8 +23,12 @@ class TestProjectIntegrity(unittest.TestCase):
             "LICENSE",
             ".gitignore",
             ".env.example",
+            "pyproject.toml",
+            "requirements.txt",
+            "TASK.md",
             "app_gui.py",
             "src/extract.py",
+            "src/cuda_utils.py",
             "docs/architecture/pipeline.md",
             "docs/architecture/obsidian_vault.md",
         ]
